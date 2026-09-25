@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project: generated at runtime, must not be committed (subject ch. VIII)
+data/output/

@@ -1,0 +1,30 @@
+[project]
+name = "call-me-maybe"
+version = "0.1.0"
+description = "Constrained decoding for LLM function calling."
+requires-python = ">=3.10"
+dependencies = [
+    "llm-sdk",
+    "numpy>=2.0",
+    "pydantic>=2.0",
+]
+
+# Lint tooling: installed by `uv sync` so `make lint` works on a fresh clone.
+[dependency-groups]
+dev = [
+    "flake8>=7.0",
+    "mypy>=1.10",
+]
+
+# The runnable code lives in src/ and is executed with `python -m src` from the
+# repository root, so this project is never installed as a package itself.
+[tool.uv]
+package = false
+
+# Relative path: works from any clone location, which `file:/...` did not.
+[tool.uv.sources]
+llm-sdk = { path = "llm_sdk" }
+
+[tool.mypy]
+# llm_sdk is vendored third-party code, not ours -- keep it out of `mypy .`
+exclude = ['^llm_sdk/', '^\.venv/']
