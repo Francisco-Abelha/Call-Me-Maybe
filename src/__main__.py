@@ -1,13 +1,19 @@
-"""Entry point for ``uv run python -m src``.
-
-Phase 0 placeholder: proves the package wiring and the llm_sdk dependency
-resolve correctly before any decoding logic exists.
-"""
+from .tokenizer import Tokenizer
 
 
 def main() -> None:
     """Run the function-calling pipeline."""
-    print("call-me-maybe: package entry point reached.")
+    text = "Foo © bar 𝌆 bazba ☃ qux"
+
+
+    tokenizer = Tokenizer.train(text, 10)
+    ids = tokenizer.ft_encode(text)
+    print(ids)
+    retext = tokenizer.ft_decode(ids)
+    print(retext)
+
+    print(len(text.encode("utf-8")), "->", len(ids))
+    print(retext == text)
 
 
 if __name__ == "__main__":
