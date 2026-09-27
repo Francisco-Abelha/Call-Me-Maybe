@@ -1,4 +1,6 @@
 from .tokenizer import Tokenizer
+from .parse import Parser
+import json
 
 
 def main() -> None:
@@ -14,6 +16,15 @@ def main() -> None:
 
     print(len(text.encode("utf-8")), "->", len(ids))
     print(retext == text)
+
+    print("---------")
+    path = "data/input/function_calling_tests.json"
+    try: 
+        data = Parser.parse(path)
+        for elem in data:
+            print(elem)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":
