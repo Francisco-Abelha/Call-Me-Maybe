@@ -1,11 +1,13 @@
 from .tokenizer import Tokenizer
 from .parse import load_prompts, load_functions
 from .prompt import build_prompt
+from .models import FunctionCall
 import json, time
 import pydantic
 from llm_sdk import Small_LLM_Model
 import numpy
 from pathlib import Path
+import re
 
 def generate(m: Small_LLM_Model, ids: any) -> list:
     STOP = {151643, 151645}
@@ -21,6 +23,20 @@ def generate(m: Small_LLM_Model, ids: any) -> list:
         gen.append(nxt)
     el = time.time() - t0
     return gen
+
+
+def parse_json_response(text: str):
+    """Just to check the model end to end, uses the 
+    'hope the model gets
+    it right' aproach. Will be swapped out when i 
+    build the constrained decoding aproach
+    """
+    text = text.strip()
+
+    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*```$", "", text)
+    return json.loads(text)
+
 
 
 def main() -> None:
@@ -45,13 +61,16 @@ def main() -> None:
    
     print("\n=== RAW GENERATED TEXT ===")
     data = m.decode(gen)
-    print(repr(data))
+    json_obj = parse_json_response(data)
+    call = FunctionCall(prompt=prompt, **json_obj)
+    print(call)
 
-    out = Path("data/output/functiopn_calling_results.json")
+
+    out = Path("data/output/function_calling_results.json")
     out.parent.mkdir(parents=True, exist_ok=True)
 
     with open(out, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4, ensure_ascii=False)
+        json.dump(call.model_dump(), f, indent=4, ensure_ascii=False)
     #print("\n%d tokens in %.1fs (%.2fs/token)" % (len(gen), el, el / max(len(gen), 1)))
     try:
         print("json.loads ->", json.loads(m.decode(gen)))
