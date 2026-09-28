@@ -1,5 +1,5 @@
 from pydantic import TypeAdapter
-from models import PromptItem, FunctionDef
+from .models import PromptItem, FunctionDef
 
 
 def load_prompts(path: str) -> list[str]:
