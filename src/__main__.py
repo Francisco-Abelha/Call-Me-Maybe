@@ -9,13 +9,15 @@ import numpy
 from pathlib import Path
 import re
 
+max_tokens = 200
+
 def generate(m: Small_LLM_Model, ids: any) -> list:
     STOP = {151643, 151645}
     t0 = time.time()
     gen = []
-    for step in range(60):
+    for step in range(max_tokens):
         logits = m.get_logits_from_input_ids(ids)
-        nxt = numpy.argmax(logits)
+        nxt = int(numpy.argmax(logits))
         if nxt in STOP:
             print("\n[Stopped on", nxt, "after", step, "tokens]")
             break
@@ -44,38 +46,25 @@ def main() -> None:
 
     m = Small_LLM_Model()
 
-    for s in ["<|im_start|>", "<|im_end|>", "<|endoftext|>", "<think>", "</think>"]:
-        print(f"{s:16} -> {m.encode(s).tolist()[0]}")
-        print()
-
     defs = load_functions("data/input/functions_definition.json")
-    prompt = "What is the sum of 2 and 3?"
-    full = build_prompt(defs, prompt)
+    prompts = load_prompts("data/input/function_calling_tests.json")
+    results: list[FunctionCall] = []
 
-    print("=== prompt tail ===")
-    print(full[-200:])
-    ids = m.encode(full).tolist()[0]
-    print("\nprompt length:", len(ids), "tokens")
-
-    gen = generate(m, ids)
-   
-    print("\n=== RAW GENERATED TEXT ===")
-    data = m.decode(gen)
-    json_obj = parse_json_response(data)
-    call = FunctionCall(prompt=prompt, **json_obj)
-    print(call)
-
+    for prompt in prompts:
+        ids = m.encode(build_prompt(defs, prompt)).tolist()[0]
+        text = m.decode(generate(m, ids))
+        results.append(FunctionCall(prompt=prompt, **parse_json_response(text)))
 
     out = Path("data/output/function_calling_results.json")
     out.parent.mkdir(parents=True, exist_ok=True)
 
     with open(out, "w", encoding="utf-8") as f:
-        json.dump(call.model_dump(), f, indent=4, ensure_ascii=False)
+        json.dump([r.model_dump() for r in results], f, indent=4, ensure_ascii=False)
     #print("\n%d tokens in %.1fs (%.2fs/token)" % (len(gen), el, el / max(len(gen), 1)))
-    try:
+    """ try:
         print("json.loads ->", json.loads(m.decode(gen)))
     except Exception as e:
-        print("json.loads FAILED ->", type(e).__name__ + ":", e)
+        print("json.loads FAILED ->", type(e).__name__ + ":", e) """
 
 
 if __name__ == "__main__":
