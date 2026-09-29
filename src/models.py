@@ -1,4 +1,4 @@
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 
 
 class PromptItem(BaseModel):
@@ -17,5 +17,10 @@ class FunctionDef(BaseModel):
 
 class FunctionCall(BaseModel):
     prompt: str
+    name: str
+    parameters: dict[str, float | str | bool]
+
+
+class JSONResponse(BaseModel):
     name: str
     parameters: dict[str, float | str | bool]

@@ -26,5 +26,8 @@ package = false
 llm-sdk = { path = "llm_sdk" }
 
 [tool.mypy]
-# llm_sdk is vendored third-party code, not ours -- keep it out of `mypy .`
 exclude = ['^llm_sdk/', '^\.venv/']
+
+[[tool.mypy.overrides]]
+module = "llm_sdk.*"
+follow_imports = "skip"

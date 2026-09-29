@@ -35,13 +35,13 @@ class Tokenizer:
         while i < len(ids):
             if i < len(ids) - 1 and ids[i] == pair[0] and ids[i + 1] == pair[1]:
                 newids.append(idx)
-                i+= 2
+                i += 2
             else:
                 newids.append(ids[i])
-                i+= 1
+                i += 1
         return newids
 
-    def ft_encode(self, text: str) -> list[int]:
+    def encode(self, text: str) -> list[int]:
         tokens = text.encode("utf-8", errors="replace")
         tokens = list(map(int, tokens))
         while len(tokens) >= 2:
@@ -53,8 +53,7 @@ class Tokenizer:
             tokens = self.merge(tokens, pair, idx)
         return tokens
 
-    def ft_decode(self, ids: list[int]) -> str:
+    def decode(self, ids: list[int]) -> str:
         tokens = b"".join(self.vocab[idx] for idx in ids)
         text = tokens.decode("utf-8", errors="replace")
         return text
-        
