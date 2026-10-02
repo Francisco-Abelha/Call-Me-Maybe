@@ -36,6 +36,7 @@ def byte_level_to_text(token: str) -> str | None:
 
 
 class Vocab(BaseModel):
+
     id_to_text: dict[int, str]
     partial_ids: set[int]
 

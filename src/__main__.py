@@ -1,6 +1,7 @@
 from .parse import load_prompts, load_functions
 from .prompt import build_prompt
 from .models import FunctionCall, JSONResponse
+from .vocab import Vocab
 import json
 # import time
 from llm_sdk import Small_LLM_Model

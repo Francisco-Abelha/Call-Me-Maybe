@@ -14,6 +14,7 @@ dependencies = [
 dev = [
     "flake8>=7.0",
     "mypy>=1.10",
+    "pytest>=9.1.1",
 ]
 
 # The runnable code lives in src/ and is executed with `python -m src` from the
@@ -24,6 +25,11 @@ package = false
 # Relative path: works from any clone location, which `file:/...` did not.
 [tool.uv.sources]
 llm-sdk = { path = "llm_sdk" }
+
+[tool.pytest.ini_options]
+# src/ is not an installed package, so put the repo root on sys.path for tests.
+pythonpath = ["."]
+testpaths = ["tests"]
 
 [tool.mypy]
 exclude = ['^llm_sdk/', '^\.venv/']
