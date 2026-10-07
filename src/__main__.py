@@ -64,7 +64,6 @@ def generate_name(m: Small_LLM_Model, ids: list[int], names: list[str], v: Vocab
     raise RuntimeError("name generation did not finish")
 
 
-
 def main() -> None:
     """Run the function-calling pipeline."""
 
