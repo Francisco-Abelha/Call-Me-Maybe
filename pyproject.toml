@@ -7,6 +7,9 @@ dependencies = [
     "llm-sdk",
     "numpy>=2.0",
     "pydantic>=2.0",
+    # Listed only so the CPU-only index below applies to it. llm_sdk depends on
+    # torch; this project never imports it.
+    "torch>=2.0.0",
 ]
 
 # Lint tooling: installed by `uv sync` so `make lint` works on a fresh clone.
@@ -22,9 +25,19 @@ dev = [
 [tool.uv]
 package = false
 
+# PyTorch's CPU-only wheels. On Linux the default PyPI torch pulls ~3.3GB of
+# NVIDIA CUDA libraries that this project never loads -- llm_sdk falls back to
+# the CPU device when no GPU is present. macOS has no CUDA builds at all, so it
+# keeps the default wheel and its MPS support.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 # Relative path: works from any clone location, which `file:/...` did not.
 [tool.uv.sources]
 llm-sdk = { path = "llm_sdk" }
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.pytest.ini_options]
 # src/ is not an installed package, so put the repo root on sys.path for tests.
