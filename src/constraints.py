@@ -36,4 +36,5 @@ def allowed_number_tokens(so_far: str, delimiter: str, vocab: Vocab) -> list[int
 
 
 def allowed_string_tokens(so_far: str, vocab: Vocab) -> list[int]:
-    pass
+    allowed: list[int] = []
+    return allowed

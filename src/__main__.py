@@ -1,7 +1,7 @@
 from .parse import load_prompts, load_functions
 from .prompt import build_prompt
-from .constraints import allowed_name_tokens
-from .models import FunctionCall, JSONResponse
+from .constraints import allowed_name_tokens, allowed_number_tokens
+from .models import FunctionCall, JSONResponse, FunctionDef
 from .vocab import Vocab
 import json
 # import time
@@ -48,12 +48,17 @@ def force(m: Small_LLM_Model, ids: list[int], text: str) -> None:
     ids.extend(m.encode(text).tolist()[0])
 
 
-def generate_name(m: Small_LLM_Model, ids: list[int], names: list[str], v: Vocab):
+def generate_name(m: Small_LLM_Model, ids: list[int], names: list[str], v: Vocab) -> str:
     """generate a function name, constrained to the given names"""
 
     so_far = ""
     for _ in range(max_tokens):
         allowed = allowed_name_tokens(so_far, names, v)
+        if not allowed:
+            raise ValueError(
+                f"so_far: {so_far}"
+                f", and names: {names}"
+            )
         logits = numpy.array(m.get_logits_from_input_ids(ids))
         nxt = allowed[int(numpy.argmax(logits[allowed]))]
         ids.append(nxt)
@@ -62,6 +67,25 @@ def generate_name(m: Small_LLM_Model, ids: list[int], names: list[str], v: Vocab
             return so_far + text[:-1]
         so_far += text
     raise RuntimeError("name generation did not finish")
+
+
+def generate_number(m: Small_LLM_Model, ids: list[int], delimiter: str, v: Vocab) -> str:
+    so_far = ""
+    for _ in range(32):
+        allowed = allowed_number_tokens(so_far, delimiter, v)
+        if not allowed:
+            raise ValueError(
+                f"so_far: {so_far}"
+                f", and delimiter: {delimiter}"
+            )
+        logits = numpy.array(m.get_logits_from_input_ids(ids))
+        nxt = allowed[int(numpy.argmax(logits[allowed]))]
+        ids.append(nxt)
+        text = v.id_to_text[nxt]
+        if text == delimiter:
+            return so_far
+        so_far += text
+    raise RuntimeError("number parameter generation did not finish")
 
 
 def main() -> None:
@@ -73,9 +97,10 @@ def main() -> None:
     defs = load_functions("data/input/functions_definition.json")
     prompts = load_prompts("data/input/function_calling_tests.json")
 
-    names: list[str] = []
+    by_name: dict[str, FunctionDef] = {}
     for function in defs:
-        names.append(function.name)
+        by_name[function.name] = function
+
     results: list[FunctionCall] = []
 
     for prompt in prompts:
@@ -83,8 +108,28 @@ def main() -> None:
         start = len(ids)
 
         force(m, ids, '{"name": "')
-        name = generate_name(m, ids, names, v)
-        generate(m, ids)
+        name = generate_name(m, ids, list(by_name), v)
+        deff = by_name[name]
+        allnum = True
+        for spec in deff.parameters.values():
+            if spec.type != "number":
+                allnum = False
+        if not deff.parameters:
+            force(m, ids, ', "parameters": {}}')
+        elif allnum:
+            force(m, ids, ', "parameters": {')
+            val: dict[str, str] = {}
+            param_count = len(deff.parameters)
+            for i, (pname, spec) in enumerate(deff.parameters.items()):
+                force(m, ids, f'"{pname}": ')
+                if i < param_count - 1:
+                    delimiter = ","
+                else:
+                    delimiter = "}"
+                val[pname] = generate_number(m, ids, delimiter, v)
+            force(m, ids, "}")
+        else:
+            generate(m, ids)
 
         text = m.decode(ids[start:])
         print(f"{prompt!r} -> {name}")
