@@ -35,6 +35,41 @@ def allowed_number_tokens(so_far: str, delimiter: str, vocab: Vocab) -> list[int
     return allowed
 
 
+def simulate_string(so_far: str, token_text: str) -> str | None:
+    """Return the state after appending token_text, or None if invalid.
+    State is either 'normal' or 'escape'.
+    """
+    
+    state = "normal"
+    for ch in so_far:
+        if state == "escape":
+            state = "normal"
+        elif ch == "\\":
+            state = "escape"
+    for i, ch in enumerate(token_text):
+        if state == "escape":
+            if ch in ('"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'):
+                state = "normal"
+            else:
+                return None
+        else:
+            if ch == '\\':
+                state = "escape"
+            elif ch == '"':
+                if i == len(token_text) - 1:
+                    return "terminated"
+                else:
+                    return None
+            elif ord(ch) < 0x20:
+                return None
+    return state
+
+
 def allowed_string_tokens(so_far: str, vocab: Vocab) -> list[int]:
     allowed: list[int] = []
+    for (tok_id, text) in vocab.id_to_text.items():
+        if not text:
+            continue
+        if simulate_string(so_far, text):
+            allowed.append(tok_id)
     return allowed

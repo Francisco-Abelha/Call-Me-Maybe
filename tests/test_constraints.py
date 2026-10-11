@@ -1,7 +1,7 @@
 # tests/test_constraints.py
 import json
 
-from src.constraints import allowed_name_tokens, allowed_number_tokens
+from src.constraints import allowed_name_tokens, allowed_number_tokens, allowed_string_tokens
 from src.vocab import Vocab
 
 NAMES = ["fn_add_numbers", "fn_greet", "fn_get_square_root"]
@@ -71,6 +71,40 @@ def _num(so_far: str, delimiter: str = ",") -> set[str]:
     """Allowed token texts for a number in the given state."""
     ids = allowed_number_tokens(so_far, delimiter, NUM_VOCAB)
     return {NUM_VOCAB.id_to_text[i] for i in ids}
+
+
+# --- strings: setup -------------------------------------------------------
+
+STR_VOCAB = Vocab(
+    id_to_text={
+        0: "a",
+        1: "hello",
+        2: '"',           # closing quote (terminator)
+        3: "\\",          # lone backslash (starts escape)
+        4: "n",           # valid after backslash
+        5: "\\n",         # backslash + n in one token
+        6: 'world"',      # text ending with closing quote
+        7: "",            # empty token
+        8: "\t",          # control char (0x09)
+        9: "\n",          # control char (0x0a)
+        10: "x",          # not a valid escape char on its own
+        11: "\\t",        # backslash + t in one token
+        12: 'ab"cd',      # quote mid-token (invalid)
+        13: "\\\\",       # two backslashes (escape + backslash)
+        14: '\\"',        # escaped quote (not a terminator)
+        15: "ab\\ncd",    # text with escape sequence mid-token
+        16: "ab\\",       # text ending with backslash
+        17: " ",          # space (valid, ord 0x20)
+        18: "\\x",        # invalid escape sequence
+    },
+    partial_ids=set(),
+)
+
+
+def _str(so_far: str) -> set[str]:
+    """Allowed token texts for a string in the given state."""
+    ids = allowed_string_tokens(so_far, STR_VOCAB)
+    return {STR_VOCAB.id_to_text[i] for i in ids}
 
 
 # --- function names -------------------------------------------------------
@@ -169,3 +203,123 @@ def test_leading_zeros_blocked_for_runtime_built_strings() -> None:
         for ch in target:
             so_far += ch
         assert _num(so_far) & DIGIT_TEXTS == set(), f"{target!r} allows a leading zero"
+
+
+# --- strings: basic normal-mode tokens -----------------------------------
+
+def test_string_start_allows_text_and_terminator() -> None:
+    allowed = _str("")
+    assert "a" in allowed
+    assert "hello" in allowed
+    assert '"' in allowed        # empty string is valid
+    assert " " in allowed
+
+
+def test_string_mid_allows_continuation() -> None:
+    allowed = _str("hel")
+    assert "a" in allowed
+    assert "hello" in allowed
+    assert '"' in allowed
+
+
+# --- strings: backslash and escape sequences ------------------------------
+
+def test_lone_backslash_allowed_in_normal_mode() -> None:
+    assert "\\" in _str("")
+    assert "\\" in _str("abc")
+
+
+def test_after_backslash_only_valid_escape_chars() -> None:
+    allowed = _str("\\")
+    assert "n" in allowed         # \n
+    assert "x" not in allowed     # \x is not valid JSON escape
+    assert "a" not in allowed     # \a is not valid JSON escape
+    assert "hello" not in allowed # starts with 'h', not a valid escape
+
+
+def test_backslash_n_single_token() -> None:
+    assert "\\n" in _str("")      # valid escape as one token
+    assert "\\t" in _str("")
+
+
+def test_invalid_escape_single_token() -> None:
+    assert "\\x" not in _str("")  # \x not valid JSON escape
+
+
+# --- strings: escaped quote is not a terminator ---------------------------
+
+def test_escaped_quote_allowed() -> None:
+    assert '\\"' in _str("")      # produces \" in the string, not termination
+
+
+def test_escaped_quote_after_backslash() -> None:
+    # so_far ends with \, token is " → valid escape, and it's the last char
+    # but this is consuming the escape, so it should be allowed
+    allowed = _str("\\")
+    assert '"' in allowed
+
+
+# --- strings: double backslash -------------------------------------------
+
+def test_double_backslash_returns_to_normal() -> None:
+    assert "\\\\" in _str("")     # \\ is escape + backslash → back to normal
+    # after \\, we're in normal mode, so regular chars are allowed
+    allowed = _str("\\\\")
+    assert "a" in allowed
+    assert '"' in allowed
+
+
+# --- strings: terminator detection ---------------------------------------
+
+def test_quote_at_end_of_token_terminates() -> None:
+    assert 'world"' in _str("")
+    assert 'world"' in _str("hello ")
+
+
+def test_quote_mid_token_rejected() -> None:
+    assert 'ab"cd' not in _str("")
+    assert 'ab"cd' not in _str("hello")
+
+
+# --- strings: control characters blocked ----------------------------------
+
+def test_control_chars_blocked() -> None:
+    assert "\t" not in _str("")
+    assert "\n" not in _str("")
+    assert "\t" not in _str("abc")
+
+
+# --- strings: empty token ignored ----------------------------------------
+
+def test_empty_token_ignored() -> None:
+    assert "" not in _str("")
+
+
+# --- strings: compound tokens --------------------------------------------
+
+def test_text_with_escape_mid_token() -> None:
+    assert "ab\\ncd" in _str("")  # a, b, \n, c, d — all valid
+
+
+def test_text_ending_with_backslash() -> None:
+    # "ab\" leaves us in escape state — that's valid (next token
+    # must start with a valid escape char)
+    assert "ab\\" in _str("")
+
+
+# --- strings: reachability ------------------------------------------------
+
+def test_simple_strings_reachable() -> None:
+    so_far = ""
+    assert "hello" in _str(so_far)
+    so_far += "hello"
+    assert '"' in _str(so_far)
+
+
+def test_string_with_escape_reachable() -> None:
+    so_far = ""
+    assert "hello" in _str(so_far)
+    so_far += "hello"
+    assert "\\n" in _str(so_far)
+    so_far += "\\n"
+    assert '"' in _str(so_far)

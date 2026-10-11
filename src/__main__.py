@@ -1,6 +1,6 @@
 from .parse import load_prompts, load_functions
 from .prompt import build_prompt
-from .constraints import allowed_name_tokens, allowed_number_tokens
+from .constraints import allowed_name_tokens, allowed_number_tokens, allowed_string_tokens, simulate_string
 from .models import FunctionCall, JSONResponse, FunctionDef
 from .vocab import Vocab
 import json
@@ -88,6 +88,26 @@ def generate_number(m: Small_LLM_Model, ids: list[int], delimiter: str, v: Vocab
     raise RuntimeError("number parameter generation did not finish")
 
 
+def generate_string(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
+    so_far = ""
+    for _ in range(max_tokens):
+        allowed = allowed_string_tokens(so_far, v)
+        if not allowed:
+            raise ValueError(f"so_far: {so_far}")
+        logits = numpy.array(m.get_logits_from_input_ids(ids))
+        for tid in allowed:
+            if simulate_string(so_far, v.id_to_text[tid]) == "terminated":
+                logits[tid] += len(so_far) * 0.1
+        nxt = allowed[int(numpy.argmax(logits[allowed]))]
+        ids.append(nxt)
+        text = v.id_to_text[nxt]
+        if simulate_string(so_far, text) == "terminated":
+            return so_far + text[:-1]
+        so_far += text
+    raise RuntimeError("string generation did not finish")
+
+
+
 def main() -> None:
     """Run the function-calling pipeline."""
 
@@ -110,13 +130,9 @@ def main() -> None:
         force(m, ids, '{"name": "')
         name = generate_name(m, ids, list(by_name), v)
         deff = by_name[name]
-        allnum = True
-        for spec in deff.parameters.values():
-            if spec.type != "number":
-                allnum = False
         if not deff.parameters:
             force(m, ids, ', "parameters": {}}')
-        elif allnum:
+        else:
             force(m, ids, ', "parameters": {')
             val: dict[str, str] = {}
             param_count = len(deff.parameters)
@@ -126,10 +142,13 @@ def main() -> None:
                     delimiter = ","
                 else:
                     delimiter = "}"
-                val[pname] = generate_number(m, ids, delimiter, v)
+                if spec.type == "number":
+                    val[pname] = generate_number(m, ids, delimiter, v)
+                elif spec.type == "string":
+                    force(m, ids, '"')
+                    val[pname] = generate_string(m, ids, v)
+                    force(m, ids, delimiter)
             force(m, ids, "}")
-        else:
-            generate(m, ids)
 
         text = m.decode(ids[start:])
         print(f"{prompt!r} -> {name}")
