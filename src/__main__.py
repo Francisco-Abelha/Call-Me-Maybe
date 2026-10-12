@@ -10,6 +10,7 @@ import numpy
 from pathlib import Path
 import re
 import sys
+import argparse
 
 
 max_tokens = 200
@@ -85,6 +86,7 @@ def generate_boolean(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
         so_far += text
     raise RuntimeError("boolean generation did not finish")
 
+
 def generate_number(m: Small_LLM_Model, ids: list[int], delimiter: str, v: Vocab) -> str:
     so_far = ""
     for _ in range(32):
@@ -123,9 +125,14 @@ def generate_string(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
     raise RuntimeError("string generation did not finish")
 
 
-
 def main() -> None:
     """Run the function-calling pipeline."""
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--functions_definition", default="data/input/functions_definition.json")
+    parser.add_argument("--input", default="data/input/function_calling_tests.json")
+    parser.add_argument("--output", default="data/output/function_calling_results.json")
+    args = parser.parse_args()
 
     try:
         m = Small_LLM_Model()
@@ -134,8 +141,8 @@ def main() -> None:
         print(f"Failed to load model or vocabulary: {e}")
         sys.exit(1)
 
-    defs = load_functions("data/input/functions_definition.json")
-    prompts = load_prompts("data/input/function_calling_tests.json")
+    defs = load_functions(args.functions_definition)
+    prompts = load_prompts(args.input)
 
     by_name: dict[str, FunctionDef] = {}
     for function in defs:
@@ -189,7 +196,7 @@ def main() -> None:
             continue
 
     try:
-        out = Path("data/output/function_calling_results.json")
+        out = Path(args.output)
         out.parent.mkdir(parents=True, exist_ok=True)
 
         with open(out, "w", encoding="utf-8") as f:
