@@ -9,6 +9,7 @@ from llm_sdk import Small_LLM_Model
 import numpy
 from pathlib import Path
 import re
+import sys
 
 
 max_tokens = 200
@@ -126,8 +127,12 @@ def generate_string(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
 def main() -> None:
     """Run the function-calling pipeline."""
 
-    m = Small_LLM_Model()
-    v = Vocab.from_file(m.get_path_to_vocab_file())
+    try:
+        m = Small_LLM_Model()
+        v = Vocab.from_file(m.get_path_to_vocab_file())
+    except (OSError, RuntimeError, ValueError) as e:
+        print(f"Failed to load model or vocabulary: {e}")
+        sys.exit(1)
 
     defs = load_functions("data/input/functions_definition.json")
     prompts = load_prompts("data/input/function_calling_tests.json")
@@ -139,54 +144,58 @@ def main() -> None:
     results: list[FunctionCall] = []
 
     for prompt in prompts:
-        ids = m.encode(build_prompt(defs, prompt)).tolist()[0]
-        start = len(ids)
-
-        force(m, ids, '{"name": "')
-        name = generate_name(m, ids, list(by_name), v)
-        deff = by_name[name]
-        if not deff.parameters:
-            force(m, ids, ', "parameters": {}}')
-        else:
-            force(m, ids, ', "parameters": {')
-            val: dict[str, str] = {}
-            param_count = len(deff.parameters)
-            for i, (pname, spec) in enumerate(deff.parameters.items()):
-                force(m, ids, f'"{pname}": ')
-                if i < param_count - 1:
-                    delimiter = ","
-                else:
-                    delimiter = "}"
-                if spec.type == "number":
-                    val[pname] = generate_number(m, ids, delimiter, v)
-                elif spec.type == "string":
-                    force(m, ids, '"')
-                    val[pname] = generate_string(m, ids, v)
-                    force(m, ids, delimiter)
-                elif spec.type == "boolean":
-                    val[pname] = generate_boolean(m, ids, v)
-                    force(m, ids, delimiter)
-            force(m, ids, "}")
-
-        text = m.decode(ids[start:])
-        print(f"{prompt!r} -> {name}")
-        print("  raw:", text)
         try:
-            raw = parse_json_response(text)
-            results.append(FunctionCall(prompt=prompt, name=raw.name, parameters=raw.parameters))
-        except ValueError as e:
-            print("  parse failed:", e)
+            ids = m.encode(build_prompt(defs, prompt)).tolist()[0]
+            start = len(ids)
 
-    out = Path("data/output/function_calling_results.json")
-    out.parent.mkdir(parents=True, exist_ok=True)
+            force(m, ids, '{"name": "')
+            name = generate_name(m, ids, list(by_name), v)
+            deff = by_name[name]
+            if not deff.parameters:
+                force(m, ids, ', "parameters": {}}')
+            else:
+                force(m, ids, ', "parameters": {')
+                val: dict[str, str] = {}
+                param_count = len(deff.parameters)
+                for i, (pname, spec) in enumerate(deff.parameters.items()):
+                    force(m, ids, f'"{pname}": ')
+                    if i < param_count - 1:
+                        delimiter = ","
+                    else:
+                        delimiter = "}"
+                    if spec.type == "number":
+                        val[pname] = generate_number(m, ids, delimiter, v)
+                    elif spec.type == "string":
+                        force(m, ids, '"')
+                        val[pname] = generate_string(m, ids, v)
+                        force(m, ids, delimiter)
+                    elif spec.type == "boolean":
+                        val[pname] = generate_boolean(m, ids, v)
+                        force(m, ids, delimiter)
+                    else:
+                        raise ValueError(f"Unknown parameter type: {spec.type}")
+                force(m, ids, "}")
 
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump([r.model_dump() for r in results], f, indent=4, ensure_ascii=False)
-    # print("\n%d tokens in %.1fs (%.2fs/token)" % (len(gen), el, el / max(len(gen), 1)))
-    """ try:
-        print("json.loads ->", json.loads(m.decode(gen)))
-    except Exception as e:
-        print("json.loads FAILED ->", type(e).__name__ + ":", e) """
+            text = m.decode(ids[start:])
+            print(f"{prompt!r} -> {name}")
+            print("  raw:", text)
+            try:
+                raw = parse_json_response(text)
+                results.append(FunctionCall(prompt=prompt, name=raw.name, parameters=raw.parameters))
+            except ValueError as e:
+                print("  parse failed:", e)
+        except (ValueError, RuntimeError) as e:
+            print(f"Prompt: {prompt}, {e}")
+            continue
+
+    try:
+        out = Path("data/output/function_calling_results.json")
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(out, "w", encoding="utf-8") as f:
+            json.dump([r.model_dump() for r in results], f, indent=4, ensure_ascii=False)
+    except (PermissionError, OSError) as e:
+        print(f"Failed to generate output file: {e}")
 
 
 if __name__ == "__main__":
