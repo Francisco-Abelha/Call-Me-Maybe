@@ -16,6 +16,18 @@ def allowed_name_tokens(so_far: str, names: list[str], vocab: Vocab) -> list[int
     return allowed
 
 
+def allowed_boolean_tokens(so_far: str, values: list[str], vocab: Vocab) -> list[int]:
+    allowed: list[int] = []
+    for (tok_id, text) in vocab.id_to_text.items():
+        if not text:
+            continue
+        if any(
+            value.startswith(so_far + text) for value in values
+        ) or (so_far + text in values):
+            allowed.append(tok_id)
+    return allowed
+
+
 def allowed_number_tokens(so_far: str, delimiter: str, vocab: Vocab) -> list[int]:
     allowed: list[int] = []
     has_digit = any(ch in DIGITS for ch in so_far)
@@ -39,7 +51,7 @@ def simulate_string(so_far: str, token_text: str) -> str | None:
     """Return the state after appending token_text, or None if invalid.
     State is either 'normal' or 'escape'.
     """
-    
+
     state = "normal"
     for ch in so_far:
         if state == "escape":

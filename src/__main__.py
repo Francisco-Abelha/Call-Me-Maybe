@@ -1,6 +1,6 @@
 from .parse import load_prompts, load_functions
 from .prompt import build_prompt
-from .constraints import allowed_name_tokens, allowed_number_tokens, allowed_string_tokens, simulate_string
+from .constraints import allowed_name_tokens, allowed_number_tokens, allowed_string_tokens, simulate_string, allowed_boolean_tokens
 from .models import FunctionCall, JSONResponse, FunctionDef
 from .vocab import Vocab
 import json
@@ -69,6 +69,21 @@ def generate_name(m: Small_LLM_Model, ids: list[int], names: list[str], v: Vocab
     raise RuntimeError("name generation did not finish")
 
 
+def generate_boolean(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
+    so_far = ""
+    for _ in range(max_tokens):
+        allowed = allowed_boolean_tokens(so_far, ["true", "false"], v)
+        if not allowed:
+            raise ValueError(f"so_far: {so_far}")
+        logits = numpy.array(m.get_logits_from_input_ids(ids))
+        nxt = allowed[int(numpy.argmax(logits[allowed]))]
+        ids.append(nxt)
+        text = v.id_to_text[nxt]
+        if (so_far + text) in ["true", "false"]:
+            return so_far + text
+        so_far += text
+    raise RuntimeError("boolean generation did not finish")
+
 def generate_number(m: Small_LLM_Model, ids: list[int], delimiter: str, v: Vocab) -> str:
     so_far = ""
     for _ in range(32):
@@ -97,7 +112,7 @@ def generate_string(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
         logits = numpy.array(m.get_logits_from_input_ids(ids))
         for tid in allowed:
             if simulate_string(so_far, v.id_to_text[tid]) == "terminated":
-                logits[tid] += len(so_far) * 0.1
+                logits[tid] += len(so_far) ** 1.5 * 0.05
         nxt = allowed[int(numpy.argmax(logits[allowed]))]
         ids.append(nxt)
         text = v.id_to_text[nxt]
@@ -147,6 +162,9 @@ def main() -> None:
                 elif spec.type == "string":
                     force(m, ids, '"')
                     val[pname] = generate_string(m, ids, v)
+                    force(m, ids, delimiter)
+                elif spec.type == "boolean":
+                    val[pname] = generate_boolean(m, ids, v)
                     force(m, ids, delimiter)
             force(m, ids, "}")
 
