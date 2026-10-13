@@ -219,3 +219,5 @@ __marimo__/
 
 # Project: generated at runtime, must not be committed (subject ch. VIII)
 data/output/
+
+src/tokenizer.py

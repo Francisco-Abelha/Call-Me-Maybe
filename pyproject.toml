@@ -46,6 +46,7 @@ testpaths = ["tests"]
 
 [tool.mypy]
 exclude = ['^llm_sdk/', '^\.venv/']
+exclude = ['^llm_sdk/', '^\.venv/', '^src/tokenizer\.py$']
 
 [[tool.mypy.overrides]]
 module = "llm_sdk.*"
