@@ -1,14 +1,18 @@
 from .parse import load_prompts, load_functions
 from .prompt import build_prompt
-from .constraints import allowed_name_tokens, allowed_number_tokens, allowed_string_tokens, simulate_string, allowed_boolean_tokens
-from .models import FunctionCall, JSONResponse, FunctionDef
+from .constraints import (
+    allowed_name_tokens,
+    allowed_number_tokens,
+    allowed_string_tokens,
+    simulate_string,
+    allowed_boolean_tokens
+)
+from .models import FunctionCall, FunctionDef
 from .vocab import Vocab
 import json
-# import time
 from llm_sdk import Small_LLM_Model
 import numpy
 from pathlib import Path
-import re
 import sys
 import argparse
 
@@ -16,37 +20,9 @@ import argparse
 max_tokens = 200
 
 
-def generate(m: Small_LLM_Model, ids: list[int]) -> list[int]:
-    STOP = {151643, 151645}
-    # t0 = time.time()
-    gen = []
-    for step in range(max_tokens):
-        logits = m.get_logits_from_input_ids(ids)
-        nxt = int(numpy.argmax(logits))
-        if nxt in STOP:
-            print("\n[Stopped on", nxt, "after", step, "tokens]")
-            break
-        ids.append(nxt)
-        gen.append(nxt)
-    # el = time.time() - t0
-    return gen
-
-
-def parse_json_response(text: str) -> JSONResponse:
-    """Just to check the model end to end, uses the
-    'hope the model gets
-    it right' aproach. Will be swapped out when i
-    build the constrained decoding aproach
-    """
-    text = text.strip()
-
-    text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\s*```$", "", text)
-    return JSONResponse.model_validate_json(text)
-
-
 def force(m: Small_LLM_Model, ids: list[int], text: str) -> None:
     """Append the tokens of fixed text to the context, without asking the model."""
+
     ids.extend(m.encode(text).tolist()[0])
 
 
@@ -72,6 +48,8 @@ def generate_name(m: Small_LLM_Model, ids: list[int], names: list[str], v: Vocab
 
 
 def generate_boolean(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
+    """Generate a boolean type parameter, constrained to true or false"""
+
     so_far = ""
     for _ in range(max_tokens):
         allowed = allowed_boolean_tokens(so_far, ["true", "false"], v)
@@ -88,6 +66,10 @@ def generate_boolean(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
 
 
 def generate_number(m: Small_LLM_Model, ids: list[int], delimiter: str, v: Vocab) -> str:
+    """Generate a number parameter, constrained to positive or negative numbers
+    with no leading zeros
+    """
+
     so_far = ""
     for _ in range(32):
         allowed = allowed_number_tokens(so_far, delimiter, v)
@@ -107,6 +89,10 @@ def generate_number(m: Small_LLM_Model, ids: list[int], delimiter: str, v: Vocab
 
 
 def generate_string(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
+    """Generate string parameters, constrained to any valid string token
+    and dealing with edge cases
+    """
+
     so_far = ""
     for _ in range(max_tokens):
         allowed = allowed_string_tokens(so_far, v)
@@ -153,16 +139,15 @@ def main() -> None:
     for prompt in prompts:
         try:
             ids = m.encode(build_prompt(defs, prompt)).tolist()[0]
-            start = len(ids)
 
             force(m, ids, '{"name": "')
             name = generate_name(m, ids, list(by_name), v)
             deff = by_name[name]
+            val: dict[str, str] = {}
             if not deff.parameters:
                 force(m, ids, ', "parameters": {}}')
             else:
                 force(m, ids, ', "parameters": {')
-                val: dict[str, str] = {}
                 param_count = len(deff.parameters)
                 for i, (pname, spec) in enumerate(deff.parameters.items()):
                     force(m, ids, f'"{pname}": ')
@@ -183,14 +168,10 @@ def main() -> None:
                         raise ValueError(f"Unknown parameter type: {spec.type}")
                 force(m, ids, "}")
 
-            text = m.decode(ids[start:])
-            print(f"{prompt!r} -> {name}")
-            print("  raw:", text)
-            try:
-                raw = parse_json_response(text)
-                results.append(FunctionCall(prompt=prompt, name=raw.name, parameters=raw.parameters))
-            except ValueError as e:
-                print("  parse failed:", e)
+            print(f"{prompt!r} -> {name} {val}")
+            results.append(
+                FunctionCall(prompt=prompt, name=name, parameters=val)
+            )
         except (ValueError, RuntimeError) as e:
             print(f"Prompt: {prompt}, {e}")
             continue

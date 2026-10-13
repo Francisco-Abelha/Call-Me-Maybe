@@ -4,6 +4,8 @@ import sys
 
 
 def load_prompts(path: str) -> list[str]:
+    """Load prompt file"""
+
     try:
         with open(path) as file:
             items = TypeAdapter(list[PromptItem]).validate_json(file.read())
@@ -18,12 +20,14 @@ def load_prompts(path: str) -> list[str]:
 
 
 def load_functions(path: str) -> list[FunctionDef]:
+    """Load function definitions file"""
+
     try:
         with open(path) as file:
             return TypeAdapter(list[FunctionDef]).validate_json(file.read())
     except FileNotFoundError as e:
-            print("File for the functions doesnt exist: ", e)
-            sys.exit(1)
+        print("File for the functions doesnt exist: ", e)
+        sys.exit(1)
     except ValidationError as e:
-            print("Valid functions file but wrong structure: ", e)
-            sys.exit(1)
+        print("Valid functions file but wrong structure: ", e)
+        sys.exit(1)

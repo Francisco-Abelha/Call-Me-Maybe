@@ -5,6 +5,8 @@ DIGITS = "0123456789"
 
 
 def allowed_name_tokens(so_far: str, names: list[str], vocab: Vocab) -> list[int]:
+    """Oracle for the function name tokens. Returns valid tokens ids"""
+
     allowed: list[int] = []
     for (tok_id, text) in vocab.id_to_text.items():
         if not text:
@@ -17,6 +19,7 @@ def allowed_name_tokens(so_far: str, names: list[str], vocab: Vocab) -> list[int
 
 
 def allowed_boolean_tokens(so_far: str, values: list[str], vocab: Vocab) -> list[int]:
+    """Oracle for the boolean type tokens. Returns valid tokens ids"""
     allowed: list[int] = []
     for (tok_id, text) in vocab.id_to_text.items():
         if not text:
@@ -29,6 +32,8 @@ def allowed_boolean_tokens(so_far: str, values: list[str], vocab: Vocab) -> list
 
 
 def allowed_number_tokens(so_far: str, delimiter: str, vocab: Vocab) -> list[int]:
+    """Oracle for the number tokens. Returns valid tokens ids"""
+
     allowed: list[int] = []
     has_digit = any(ch in DIGITS for ch in so_far)
     has_dot = "." in so_far
@@ -49,7 +54,7 @@ def allowed_number_tokens(so_far: str, delimiter: str, vocab: Vocab) -> list[int
 
 def simulate_string(so_far: str, token_text: str) -> str | None:
     """Return the state after appending token_text, or None if invalid.
-    State is either 'normal' or 'escape'.
+    State is either 'normal', 'escape' or 'terminate'.
     """
 
     state = "normal"
@@ -78,6 +83,8 @@ def simulate_string(so_far: str, token_text: str) -> str | None:
 
 
 def allowed_string_tokens(so_far: str, vocab: Vocab) -> list[int]:
+    """Oracle for the string tokens. Returns valid tokens ids."""
+
     allowed: list[int] = []
     for (tok_id, text) in vocab.id_to_text.items():
         if not text:

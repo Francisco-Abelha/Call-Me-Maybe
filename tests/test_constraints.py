@@ -231,10 +231,10 @@ def test_lone_backslash_allowed_in_normal_mode() -> None:
 
 def test_after_backslash_only_valid_escape_chars() -> None:
     allowed = _str("\\")
-    assert "n" in allowed         # \n
-    assert "x" not in allowed     # \x is not valid JSON escape
-    assert "a" not in allowed     # \a is not valid JSON escape
-    assert "hello" not in allowed # starts with 'h', not a valid escape
+    assert "n" in allowed          # \n
+    assert "x" not in allowed      # \x is not valid JSON escape
+    assert "a" not in allowed      # \a is not valid JSON escape
+    assert "hello" not in allowed  # starts with 'h', not a valid escape
 
 
 def test_backslash_n_single_token() -> None:
