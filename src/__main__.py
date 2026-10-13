@@ -143,7 +143,7 @@ def main() -> None:
             force(m, ids, '{"name": "')
             name = generate_name(m, ids, list(by_name), v)
             deff = by_name[name]
-            val: dict[str, str] = {}
+            val: dict[str, float | str | bool] = {}
             if not deff.parameters:
                 force(m, ids, ', "parameters": {}}')
             else:
