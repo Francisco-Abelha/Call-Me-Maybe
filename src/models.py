@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -8,7 +10,7 @@ class PromptItem(BaseModel):
 
 class ParamSpec(BaseModel):
     """Response parameter"""
-    type: str
+    type: Literal["number", "string", "boolean"]
 
 
 class FunctionDef(BaseModel):

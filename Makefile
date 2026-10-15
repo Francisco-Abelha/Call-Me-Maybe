@@ -5,12 +5,13 @@
 MYPY_FLAGS := --warn-return-any --warn-unused-ignores --ignore-missing-imports \
 	          --disallow-untyped-defs --check-untyped-defs
 
-.PHONY: install run debug clean lint lint-strict help
+.PHONY: install run debug test clean lint lint-strict help
 
 help:
 	@echo "install      Sync the virtual environment from pyproject.toml"
 	@echo "run          Run the project"
 	@echo "debug        Run the project under pdb"
+	@echo "test         Run the unit tests"
 	@echo "clean        Remove Python and tool caches"
 	@echo "lint         flake8 + mypy"
 	@echo "lint-strict  flake8 + mypy --strict"
@@ -23,6 +24,9 @@ run:
 
 debug:
 	uv run python -m pdb -m src
+
+test:
+	uv run pytest
 
 clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache

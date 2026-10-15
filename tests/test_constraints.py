@@ -1,7 +1,12 @@
 # tests/test_constraints.py
 import json
 
-from src.constraints import allowed_name_tokens, allowed_number_tokens, allowed_string_tokens
+from src.constraints import (
+    allowed_boolean_tokens,
+    allowed_name_tokens,
+    allowed_number_tokens,
+    allowed_string_tokens,
+)
 from src.vocab import Vocab
 
 NAMES = ["fn_add_numbers", "fn_greet", "fn_get_square_root"]
@@ -323,3 +328,100 @@ def test_string_with_escape_reachable() -> None:
     assert "\\n" in _str(so_far)
     so_far += "\\n"
     assert '"' in _str(so_far)
+
+
+# --- booleans: setup ------------------------------------------------------
+
+BOOL_VALUES = ["true", "false"]
+
+BOOL_VOCAB = Vocab(
+    id_to_text={
+        0: "true",      # whole value in one token
+        1: "false",     # whole value in one token
+        2: "t",
+        3: "f",
+        4: "tru",
+        5: "fal",
+        6: "rue",       # only valid after "t"
+        7: "alse",      # only valid after "f"
+        8: "e",         # only valid after "tru" / "fals"
+        9: "se",        # only valid after "fal"
+        10: "abc",      # decoy: unrelated text
+        11: "True",     # decoy: JSON booleans are lowercase
+        12: "null",     # decoy: a JSON literal, but not a boolean
+        13: "trueX",    # decoy: overshoots the value
+        14: "",         # empty token
+    },
+    partial_ids=set(),
+)
+
+BOOL_DECOYS = {"abc", "True", "null", "trueX"}
+
+
+def _bool(so_far: str) -> set[str]:
+    """Allowed token texts for a boolean in the given state."""
+    ids = allowed_boolean_tokens(so_far, BOOL_VALUES, BOOL_VOCAB)
+    return {BOOL_VOCAB.id_to_text[i] for i in ids}
+
+
+# --- booleans: state coverage ---------------------------------------------
+
+def test_boolean_start_allows_prefixes_of_both() -> None:
+    assert _bool("") == {"true", "false", "t", "f", "tru", "fal"}
+
+
+def test_boolean_after_t_commits_to_true() -> None:
+    assert _bool("t") == {"rue"}
+
+
+def test_boolean_after_f_commits_to_false() -> None:
+    assert _bool("f") == {"alse"}
+
+
+def test_boolean_mid_value_states() -> None:
+    assert _bool("tru") == {"e"}
+    assert _bool("fal") == {"se"}
+    assert _bool("fals") == {"e"}
+
+
+# --- booleans: nothing illegal gets through -------------------------------
+
+def test_boolean_decoys_never_allowed() -> None:
+    for so_far in ["", "t", "f", "tru", "fal", "fals"]:
+        assert _bool(so_far) & BOOL_DECOYS == set(), f"so_far={so_far!r}"
+
+
+def test_boolean_rejects_wrong_case() -> None:
+    """JSON booleans are lowercase: True/False are not valid literals."""
+    assert "True" not in _bool("")
+    assert _bool("T") == set()
+
+
+def test_boolean_dead_end_returns_nothing() -> None:
+    assert _bool("x") == set()
+    assert _bool("tf") == set()
+
+
+def test_boolean_complete_value_is_a_dead_end() -> None:
+    """The driver returns before asking again, so a finished value allows nothing."""
+    assert _bool("true") == set()
+    assert _bool("false") == set()
+
+
+# --- booleans: both values stay reachable ---------------------------------
+
+def test_boolean_values_are_reachable() -> None:
+    paths = [
+        ["true"],
+        ["t", "rue"],
+        ["tru", "e"],
+        ["false"],
+        ["f", "alse"],
+        ["fal", "se"],
+    ]
+    for path in paths:
+        so_far = ""
+        for text in path:
+            assert text in _bool(so_far), f"{path} blocked at {so_far!r}"
+            so_far += text
+        assert so_far in BOOL_VALUES, f"{path} produced {so_far!r}"

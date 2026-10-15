@@ -17,7 +17,9 @@ import sys
 import argparse
 
 
-max_tokens = 200
+MAX_NUMBER_TOKENS = 32
+MAX_STRING_TOKENS = 512
+BOOLEAN_VALUES = ["true", "false"]
 
 
 def force(m: Small_LLM_Model, ids: list[int], text: str) -> None:
@@ -30,7 +32,7 @@ def generate_name(m: Small_LLM_Model, ids: list[int], names: list[str], v: Vocab
     """generate a function name, constrained to the given names"""
 
     so_far = ""
-    for _ in range(max_tokens):
+    for _ in range(max((len(n) for n in names), default=0)):
         allowed = allowed_name_tokens(so_far, names, v)
         if not allowed:
             raise ValueError(
@@ -51,15 +53,15 @@ def generate_boolean(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
     """Generate a boolean type parameter, constrained to true or false"""
 
     so_far = ""
-    for _ in range(max_tokens):
-        allowed = allowed_boolean_tokens(so_far, ["true", "false"], v)
+    for _ in range(max(len(val) for val in BOOLEAN_VALUES)):
+        allowed = allowed_boolean_tokens(so_far, BOOLEAN_VALUES, v)
         if not allowed:
             raise ValueError(f"so_far: {so_far}")
         logits = numpy.array(m.get_logits_from_input_ids(ids))
         nxt = allowed[int(numpy.argmax(logits[allowed]))]
         ids.append(nxt)
         text = v.id_to_text[nxt]
-        if (so_far + text) in ["true", "false"]:
+        if (so_far + text) in BOOLEAN_VALUES:
             return so_far + text
         so_far += text
     raise RuntimeError("boolean generation did not finish")
@@ -71,7 +73,7 @@ def generate_number(m: Small_LLM_Model, ids: list[int], delimiter: str, v: Vocab
     """
 
     so_far = ""
-    for _ in range(32):
+    for _ in range(MAX_NUMBER_TOKENS):
         allowed = allowed_number_tokens(so_far, delimiter, v)
         if not allowed:
             raise ValueError(
@@ -94,7 +96,7 @@ def generate_string(m: Small_LLM_Model, ids: list[int], v: Vocab) -> str:
     """
 
     so_far = ""
-    for _ in range(max_tokens):
+    for _ in range(MAX_STRING_TOKENS):
         allowed = allowed_string_tokens(so_far, v)
         if not allowed:
             raise ValueError(f"so_far: {so_far}")
@@ -156,13 +158,13 @@ def main() -> None:
                     else:
                         delimiter = "}"
                     if spec.type == "number":
-                        val[pname] = generate_number(m, ids, delimiter, v)
+                        val[pname] = float(generate_number(m, ids, delimiter, v))
                     elif spec.type == "string":
                         force(m, ids, '"')
                         val[pname] = generate_string(m, ids, v)
                         force(m, ids, delimiter)
                     elif spec.type == "boolean":
-                        val[pname] = generate_boolean(m, ids, v)
+                        val[pname] = generate_boolean(m, ids, v) == "true"
                         force(m, ids, delimiter)
                     else:
                         raise ValueError(f"Unknown parameter type: {spec.type}")

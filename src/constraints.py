@@ -65,7 +65,7 @@ def simulate_string(so_far: str, token_text: str) -> str | None:
             state = "escape"
     for i, ch in enumerate(token_text):
         if state == "escape":
-            if ch in ('"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u'):
+            if ch in ('"', '\\', '/', 'b', 'f', 'n', 'r', 't'):
                 state = "normal"
             else:
                 return None

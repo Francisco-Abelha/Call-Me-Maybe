@@ -6,7 +6,7 @@
 Call-Me-Maybe is a program that translates natural language into structured JSON
 function calls using a small LLM with constrained decoding.
 
-An approach using constrained decoding has a 100% guarantee that the JSON code generated is valid, whereas without it we would be only getting a 30% success rate.
+An approach using constrained decoding has a 100% guarantee that the JSON code generated is valid, whereas without it we would only be getting a 30% success rate.
 
 ## Instructions
 
@@ -20,7 +20,7 @@ An approach using constrained decoding has a 100% guarantee that the JSON code g
 ## Algorithm
 The program first builds a prompt that lets the LLM know where to situate itself in the conversation, leaving what is expected as its response empty so that it starts inserting tokens in that spot.
 
-Certain portions of the response are fixed no matter what the input prompt is so i force the structure on those first and then use the oracle methods to match prefixes and get all the valid token ids for that given position, using different oracles for function names, numbers, strings or boolean types.
+Certain portions of the response are fixed no matter what the input prompt is, so i force the structure on those first and then use the oracle methods to match prefixes and get all the valid token ids for that given position using different oracles for function names, numbers, strings or boolean types.
 Invalid tokens are masked by only allowing the IDs returned by the oracle.
 
 ## Design decisions
@@ -30,18 +30,18 @@ Each type has different rules: numbers follow a mathematical grammar, strings ne
 
 - Why length bias for string termination
 
-For some cases the LLM was always finding valid values along side the terminator token so it would loop an unreasonable amount of time, generating them long after finding the required ones. Length bias introduces an increasing value to the terminator token's weight in the math that the program does on the IDS table to choose a token.
+For some cases the LLM was always finding valid values along side the terminator token so it would loop an unreasonable amount of time, generating them long after finding the required ones. Length bias introduces an increasing value to the terminator token's weight in the math that the program does on the valid IDS table to choose a token.
 
 - Why force() for JSON structure instead of generating it
 
-Certain parts of the prompt dont change so it is more cost and time effective to force that structure so the LLM doesnt have to concern itself with generating those extra tokens.
+Certain parts of the prompt don't change so it is more cost and time effective to force that structure so the LLM doesnt have to concern itself with generating those extra tokens.
 
 - Why Pydantic for validation
 
 Its required by the subject and it gives me automatic JSON parsing and type validation for input files and data models.
 
 ## Performance Analysis
-100% valid JSON, near-perfect function selection, 4-5 minutes on CPU. Unconstrained decoding with the same model achieves only 30% guarantee of Valid JSON and takes a longer time to generate.
+100% valid JSON, near-perfect function selection, under 2 minutes on CPU. Unconstrained decoding with the same model achieves only 30% guarantee of Valid JSON and takes a longer time to generate.
 
 ## Challenges
 Some problems i ran into were:
