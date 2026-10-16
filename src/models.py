@@ -10,7 +10,7 @@ class PromptItem(BaseModel):
 
 class ParamSpec(BaseModel):
     """Response parameter"""
-    type: Literal["number", "string", "boolean"]
+    type: Literal["number", "string", "boolean", "integer"]
 
 
 class FunctionDef(BaseModel):
